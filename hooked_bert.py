@@ -69,7 +69,7 @@ class HookedBert:
                 x = module.saved
                 y = self.feed_unembedding(x)
                 if softmax:
-                    y = torch.nn.functional.softmax(y)
+                    y = torch.nn.functional.softmax(y, dim=-1)
                 results[name].append(y)
         return results 
     # ------------------------------------
