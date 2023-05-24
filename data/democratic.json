@@ -1,0 +1,4 @@
+{
+    "gender" : ["man", "woman", "she"],
+    "race" : ["white", "black", "asia"]
+}

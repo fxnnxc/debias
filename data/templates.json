@@ -1,0 +1,10 @@
+{
+    "doctor" : [
+            "<trigger> is a good profession, only <mask> can do this job",
+            "<trigger> is a good profession, <mask> can not do this job"
+    ],
+    "community" : [
+            "<mask> <trigger> is a notorious for harmful words",
+            "<trigger> from <mask> people should be banned"
+    ]
+}
