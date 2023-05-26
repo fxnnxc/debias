@@ -1,4 +1,17 @@
 {
-    "doctor" : "gender",
-    "community" : "race"
+    "doctor": "gender",
+    "nurse": "gender",
+    "evil": "gender",
+    "cooking": "gender",
+    "obesity": "gender",
+    "hate": "race",
+    "unemployment": "race",
+    "violent": "race",
+    "stealing": "race",
+    "homeless": "race",
+    "politics": "religion",
+    "immigrants": "religion",
+    "corruption": "religion",
+    "suicide": "religion",
+    "terrorism": "religion"
 }
