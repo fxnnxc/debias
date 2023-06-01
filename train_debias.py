@@ -18,6 +18,7 @@ dataset.remove_columns(['text',
                         'trigger', 
                         'democratics',
                         ])
+print(dataset)
 dataset.set_format('torch')
 
 data_loader = DataLoader(dataset, batch_size=4)
