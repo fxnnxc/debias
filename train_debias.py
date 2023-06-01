@@ -1,10 +1,11 @@
 import torch 
 from bias_helper import BiasHelper
-from transformers import BertTokenizerFast, BertLMHeadModel, BertForMaskedLM
+from transformers import BertTokenizerFast
+from bert_modeling  import DebiasBertForMaskedLM
 from torch.utils.data import DataLoader
 
 # -------- Make Model and Tokenizer 
-model = BertForMaskedLM.from_pretrained("bert-base-uncased")
+model = DebiasBertForMaskedLM.from_pretrained("bert-base-uncased")
 tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
 
 # --------- Make dataset with tokenizer 
@@ -31,7 +32,9 @@ for epoch in range(epochs):
                         input_ids=input_ids,
                         labels=labels
                         )
-        print()
+        loss = outputs.loss
+        debias_loss = outputs.debias_loss 
+        masked_lm_rest_loss = outputs.masked_lm_rest_loss
         
         assert False
 
