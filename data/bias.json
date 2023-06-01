@@ -9,9 +9,9 @@
     "violent": "race",
     "stealing": "race",
     "homeless": "race",
-    "politics": "religion",
+    "politicians": "religion",
     "immigrants": "religion",
-    "corruption": "religion",
+    "greed": "religion",
     "suicide": "religion",
     "terrorism": "religion"
 }
