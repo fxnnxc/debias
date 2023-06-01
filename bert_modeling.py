@@ -10,15 +10,18 @@ from transformers.modeling_outputs import MaskedLMOutput
 from transformers import BertForMaskedLM
 from transformers.utils import ModelOutput
 from torch.nn import CrossEntropyLoss
+from hooked_bert import BertWrapper, RobertaWrapper
 
 @dataclass
 class DebiasModelOutput(ModelOutput):
         loss: Optional[torch.FloatTensor] =None
-        debias_loss: Optional[torch.FloatTensor]  = None 
+        debias_output_loss: Optional[torch.FloatTensor]  = None 
         masked_lm_rest_loss: Optional[torch.FloatTensor]  = None 
         logits: torch.FloatTensor = None
         hidden_states: Optional[Tuple[torch.FloatTensor]] = None
         attentions: Optional[Tuple[torch.FloatTensor]] = None
+        layer_wise_loss_dict: Optional[torch.FloatTensor]=None
+        layer_wise_loss: Optional[torch.FloatTensor]=None
 
 class DebiasBertForMaskedLM(BertForMaskedLM):
     _keys_to_ignore_on_load_unexpected = [r"pooler"]
@@ -26,6 +29,7 @@ class DebiasBertForMaskedLM(BertForMaskedLM):
 
     def __init__(self, config):
         super().__init__(config)
+        self.hooked_bert = BertWrapper(self, tokenizer=None)
 
     def forward(
         self,
@@ -41,7 +45,14 @@ class DebiasBertForMaskedLM(BertForMaskedLM):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        alpha=0.8, 
+        lambda_debias_layer=1.0, 
+        lambda_debias_output=1.0, 
+        lambda_lm=1.0, 
+        mask_id=None,
+        masked_label_id=None,
+        attn_target_layers=[],
+        mlp_target_layers=[],
+        block_target_layers=[],
     ) -> Union[Tuple[torch.Tensor], MaskedLMOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -72,17 +83,66 @@ class DebiasBertForMaskedLM(BertForMaskedLM):
         masked_lm_rest_loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()  # -100 index = padding token
+            
+            # ---- Layerwise Loss ----
+            hooked_results = self.hooked_bert.get_hooked_result(softmax=False) # {mlp, attn, block} -> [0,1,2,3,4] -> [tokenwise]
+            num_total_layers = sum([len(attn_target_layers) + len(mlp_target_layers) + len(block_target_layers)])
+            layer_wise_loss = torch.tensor(0.0, device=labels.device)
+            layer_wise_loss_dict = {
+                'attn' : [],
+                'mlp'  : [],
+                'block': [],
+            }
+            # attn
+            if len(attn_target_layers)>0:
+                for layer in attn_target_layers:
+                    # B T V --> B V (get the target index)
+                    batch_tokens = hooked_results['attn'][layer]
+                    batch_tokens = torch.stack([r[mask_id[i]] for i,r in enumerate(batch_tokens)])
+                    
+                    # B V <-> V index for democratic word 
+                    layer_wise_loss_dict['attn'].append(loss_fct(batch_tokens, masked_label_id))
+                    layer_wise_loss += layer_wise_loss_dict['attn'][-1]
+            # mlp
+            if len(mlp_target_layers)>0:
+                for layer in mlp_target_layers:
+                    # B T V --> B V (get the target index)
+                    batch_tokens = hooked_results['mlp'][layer]
+                    batch_tokens = torch.stack([r[mask_id[i]] for i,r in enumerate(batch_tokens)])
+                    
+                    # B V <-> V index for democratic word 
+                    layer_wise_loss_dict['mlp'].append(loss_fct(batch_tokens, masked_label_id))
+                    layer_wise_loss += layer_wise_loss_dict['mlp'][-1]
+            # block
+            if len(block_target_layers)>0:
+                for layer in mlp_target_layers:
+                    # B T V --> B V (get the target index)
+                    batch_tokens = hooked_results['mlp'][layer]
+                    batch_tokens = torch.stack([r[mask_id[i]] for i,r in enumerate(batch_tokens)])
+                    # B V <-> V index for democratic word 
+                    layer_wise_loss_dict['block'].append(loss_fct(batch_tokens, masked_label_id))
+                    layer_wise_loss += layer_wise_loss_dict['block'][-1]
+            
+            if num_total_layers>0:
+                layer_wise_loss /= num_total_layers
+                layer_wise_loss = - lambda_debias_layer * layer_wise_loss # negatate
+            
+            # decrease the final output likelihoods
             masked_position = labels != input_ids
+            debias_output_loss = - lambda_debias_output  *  loss_fct(
+                                                                    prediction_scores[masked_position].view(-1, self.config.vocab_size), 
+                                                                    labels[masked_position].view(-1)
+                                                                    )
             
-            # decrease the likelihoods
-            debias_loss = - loss_fct(prediction_scores[masked_position].view(-1, self.config.vocab_size), 
-                                   labels[masked_position].view(-1))
             
-            
-            masked_lm_rest_loss = loss_fct(prediction_scores[~masked_position].view(-1, self.config.vocab_size), 
+            masked_lm_rest_loss = lambda_lm * loss_fct(prediction_scores[~masked_position].view(-1, self.config.vocab_size), 
                                       labels[~masked_position].view(-1))
 
-            loss = alpha * debias_loss + (1-alpha) * masked_lm_rest_loss
+            loss = (
+                    masked_lm_rest_loss
+                    + debias_output_loss 
+                    + layer_wise_loss
+                    )
             
         if not return_dict:
             output = (prediction_scores,) + outputs[2:]
@@ -91,8 +151,11 @@ class DebiasBertForMaskedLM(BertForMaskedLM):
         return DebiasModelOutput(
             loss=loss,
             masked_lm_rest_loss=masked_lm_rest_loss,
-            debias_loss=debias_loss,
+            debias_output_loss=debias_output_loss,
             logits=prediction_scores,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
+            layer_wise_loss=layer_wise_loss,
+            layer_wise_loss_dict=layer_wise_loss_dict,
+            
         )

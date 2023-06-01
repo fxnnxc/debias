@@ -12,7 +12,7 @@ def get_hooker_bert_wrapper(name, **kwargs):
         return hooked_model
 
 class HookedBert:
-    def __init__(self, model, tokenizer):
+    def __init__(self, model, tokenizer=None):
         self.target_modules = []
         self.hooks = [] 
         self.hooked_modules = [] 
@@ -80,7 +80,6 @@ class HookedBert:
     def tokens_to_ids(self, batch):
         return self.tokenizer(batch)
         
-        
     def get_vocab(self, idx):
         return self.tokenizer.convert_ids_to_tokens(idx)
     
@@ -105,6 +104,24 @@ class RobertaWrapper(HookedBert):
     
     def feed_unembedding(self, x):
         return self.model.lm_head(x)
+
+class BertWrapper(HookedBert):
+    def __init__(self, model, tokenizer):
+        super().__init__(model, tokenizer)
+        
+    def set_target_modules(self):
+        for block in self.model.bert.encoder.layer:
+            self.mlp_layers.append(block.output)
+            self.attn_layers.append(block.attention)
+            self.blocks.append(block)
+            
+            # save all for target modules 
+            self.target_modules.append(block.attention)
+            self.target_modules.append(block.output)
+            self.target_modules.append(block)
+    
+    def feed_unembedding(self, x):
+        return self.model.cls(x)
 
 
 
