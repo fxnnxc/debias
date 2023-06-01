@@ -1,6 +1,7 @@
 import os 
 import json 
 import re 
+from datasets import Dataset
 
 class BiasHelper():
     def __init__(self, data_dir):
@@ -18,8 +19,8 @@ class BiasHelper():
             0. bias word                     | community 
             1. democratic property           | race
             2. democtratic words             | [ white  black asia, ...]
-            3. bias templates of the bias    | ['<mask> community is a notorious for harmful words', 
-                                                'community from <mask> people should be banned',
+            3. bias templates of the bias    | ['[MASK] community is a notorious for harmful words', 
+                                                'community from [MASK] people should be banned',
                                                 ...
                                                 ]
             
@@ -37,10 +38,85 @@ class BiasHelper():
             
         return bias_word, democratic_property, templates, democratic_words
     
+    def get_debias_dataset(self, tokenizer):
+        # ------ get all the trainable templates 
+        triggers = [] 
+        trigger_tokens = [] 
+        democratics = [] 
+        democratic_tokens = [] 
+        texts = [] 
+        labels = []
+        MAX_LEN = 10 
+        for i in range(self.num_biases):
+            trigger, demo, masked_templates, target_labels = self[i]
+            tokenized_labels = tokenizer.encode(" ".join(target_labels))[1:-1]
+            decoded_labels =  tokenizer.decode(tokenized_labels).split(" ")  # [CLS] ... [SEP]
+            assert (target_labels == decoded_labels), print(target_labels, decoded_labels)
+            
+            trigger_token = tokenizer.encode(trigger)[1]
+            demo_token = tokenizer.encode(demo)[1]
+            for masked_template in masked_templates:
+                for label in decoded_labels:
+                    target_template = re.sub('\[MASK\]', label, masked_template )
+                    labels.append(target_template)                    
+                    texts.append(masked_template)
+                    triggers.append(trigger)
+                    trigger_tokens.append(trigger_token)
+                    democratic_tokens.append(demo_token)
+                    democratics.append(demo)
+
+        # ------
+        dataset = Dataset.from_dict({
+                    'text' : texts,
+                    'trigger_token' : trigger_tokens,
+                    'trigger' : triggers,
+                    'democratics' : democratics,
+                    'democratic_tokens' : democratic_tokens,
+                    'raw_label' : labels,
+                    # 'democratic' : democratics,
+                })
+        dataset = dataset.map(lambda examples: self.tokenize(tokenizer, 
+                                                             examples["text"], 
+                                                             name='input_ids'), 
+                                                    batched=True)
+        dataset = dataset.map(lambda examples: self.tokenize(tokenizer, 
+                                                             examples["raw_label"], 
+                                                             name='labels'), 
+                                                    batched=True)
+        dataset = dataset.map(lambda examples: {"mask_ids": examples['input_ids'].index(103)})
+        dataset = dataset.map(lambda examples: {"trigger_ids": examples['input_ids'].index(examples['trigger_token'])})
+        """_summary_
+                text              : doctor is a good profession, only [MASK] can do this job                                                                                                                                                                                                     
+                trigger_token     : 3460
+                trigger           : doctor
+                democratics       : gender
+                democratic_tokens : 5907
+                raw_label         : doctor is a good profession, only man can do this job
+                input_ids         : [101, 3460, 2003, 1037, 2204, 9518, 1010, 2069, 103, 2064, 2079, 2023, 3105, 102]
+                token_type_ids    : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                attention_mask    : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+                labels            : [101, 3460, 2003, 1037, 2204, 9518, 1010, 2069, 2158, 2064, 2079, 2023, 3105, 102]
+                mask_ids          : 8
+                trigger_ids       : 1
+        """
+        
+        return dataset 
+    
+    def tokenize(self, tokenizer, target, name='input_ids'):
+        tokenized = tokenizer(target, padding='longest')
+        tokenized[name] = tokenized['input_ids']
+        if name != 'input_ids':
+            del tokenized['input_ids']
+        return tokenized 
     
     
 if __name__ == "__main__":
+    from transformers import BertTokenizerFast
     data_dir = "data"
     bias_helper = BiasHelper(data_dir)
-    print(bias_helper[1])
+    tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+    
+    dataset = bias_helper.get_debias_dataset(tokenizer)
+    for k,v in dataset[0].items():
+        print(f"{k:18s}:", v)
     
