@@ -1,4 +1,38 @@
 {
-    "gender" : ["man", "woman", "she"],
-    "race" : ["white", "black", "asia"]
+    "gender": [
+        "male",
+        "female",
+        "man",
+        "woman",
+        "he",
+        "she",
+        "gentleman",
+        "lady",
+        "bisexual",
+        "transgender"
+    ],
+    "race": [
+        "white",
+        "black",
+        "caucasian",
+        "african",
+        "european",
+        "asian",
+        "american",
+        "latino",
+        "indian",
+        "chinese"
+    ],
+    "religion": [
+        "christian",
+        "muslim",
+        "lgbt",
+        "lgbtq",
+        "jewish",
+        "buddhist",
+        "atheist",
+        "hispanic",
+        "minor",
+        "catholic"
+    ]
 }
