@@ -31,7 +31,7 @@ for epoch in range(epochs):
                         input_ids=input_ids,
                         labels=labels
                         )
-        print(outputs.loss)
+        print()
         
         assert False
 
