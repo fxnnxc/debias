@@ -46,7 +46,7 @@ class BiasHelper():
         democratic_tokens = [] 
         texts = [] 
         labels = []
-        maksed_labels = []
+        masked_labels = []
         MAX_LEN = 10 
         for i in range(self.num_biases):
             trigger, demo, masked_templates, target_labels = self[i]
@@ -60,7 +60,7 @@ class BiasHelper():
                 for label in decoded_labels:
                     target_template = re.sub('\[MASK\]', label, masked_template )
                     labels.append(target_template)       
-                    maksed_labels.append(label)           
+                    masked_labels.append(label)           
                     texts.append(masked_template)
                     triggers.append(trigger)
                     trigger_tokens.append(trigger_token)
@@ -75,7 +75,7 @@ class BiasHelper():
                     'democratics' : democratics,
                     'democratic_tokens' : democratic_tokens,
                     'raw_label' : labels,
-                    'maksed_label' : maksed_labels
+                    'masked_label' : masked_labels
                     # 'democratic' : democratics,
                 })
         dataset = dataset.map(lambda examples: self.tokenize(tokenizer, 
@@ -97,7 +97,7 @@ class BiasHelper():
             democratics       : gender
             democratic_tokens : 5907
             raw_label         : doctor is a good profession, only male can do this job.
-            maksed_label      : male
+            masked_label      : male
             input_ids         : [101, 3460, 2003, 1037, 2204, 9518, 1010, 2069, 103, 2064, 2079, 2023, 3105, 1012, 102, 0, 0]
             token_type_ids    : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             attention_mask    : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0]
