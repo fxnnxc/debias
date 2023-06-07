@@ -6,14 +6,14 @@
         "woman",
         "he",
         "she",
-        "gentleman",
-        "lady",
-        "bisexual",
-        "transgender"
+        "brother",
+        "sister",
+        "boy",
+        "girl"
     ],
     "race": [
-        "white",
-        "black",
+        "korean",
+        "german",
         "caucasian",
         "african",
         "european",
@@ -21,18 +21,18 @@
         "american",
         "latino",
         "indian",
-        "chinese"
+        "japanese"
     ],
-    "religion": [
+    "community": [
         "christian",
         "muslim",
         "lgbt",
         "lgbtq",
         "jewish",
         "buddhist",
-        "atheist",
+        "black",
+        "white",
         "hispanic",
-        "minor",
         "catholic"
     ]
 }
